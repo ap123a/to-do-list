@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        #task-list {
+            margin-top: 20px;
+        }
+
+        .task {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .task input[type="text"] {
+            flex: 1;
+            margin-right: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        .task select {
+            margin-right: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        input[type="text"] {
+            margin-bottom: 10px;
+            padding: 10px;
+            width: calc(100% - 22px);
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        #add-task-container {
+            display: flex;
+            flex-direction: column;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        #add-task-container button {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>To-Do List</h1>
+    <input type="text" id="title" placeholder="Uzdevuma nosaukums">
+    <input type="text" id="description" placeholder="Uzdevuma apraksts">
+    <button onclick="addTask()">Pievienot uzdevumu</button>
+
+    <div id="task-list"></div>
+
+    <script>
+        async function fetchTasks() {
+            const response = await fetch('/tasks');
+            const tasks = await response.json();
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+
+            tasks.forEach(task => {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = 'task';
+                taskDiv.innerHTML = `
+                    <input type="text" value="${task.title}" onchange="updateTask('${task._id}', 'title', this.value)">
+                    <input type="text" value="${task.description}" onchange="updateTask('${task._id}', 'description', this.value)">
+                    <select onchange="updateTask('${task._id}', 'status', this.value)">
+                        <option value="nepabeigts" ${task.status === 'nepabeigts' ? 'selected' : ''}>Nepabeigts</option>
+                        <option value="pabeigts" ${task.status === 'pabeigts' ? 'selected' : ''}>Pabeigts</option>
+                    </select>
+                    <button onclick="deleteTask('${task._id}')">Dzēst</button>
+                `;
+                taskList.appendChild(taskDiv);
+            });
+        }
+
+        async function addTask() {
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+
+            if (title && description) {
+                await fetch('/tasks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ title, description })
+                });
+                document.getElementById('title').value = '';
+                document.getElementById('description').value = '';
+                fetchTasks();
+            } else {
+                alert('Lūdzu, aizpildiet visus laukus!');
+            }
+        }
+
+        async function updateTask(id, field, value) {
+            await fetch(`/tasks/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ [field]: value })
+            });
+            fetchTasks();
+        }
+
+        async function deleteTask(id) {
+            await fetch(`/tasks/${id}`, {
+                method: 'DELETE'
+            });
+            fetchTasks();
+        }
+
+        // Ielādēt uzdevumus, kad lapa tiek ielādēta
+        window.onload = fetchTasks;
+    </script>
+</body>
+</html>

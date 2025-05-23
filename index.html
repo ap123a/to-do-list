@@ -17,8 +17,12 @@
             color: #333;
         }
 
-        #task-list {
-            margin-top: 20px;
+        #auth-container,
+        #add-task-container,
+        #task-list,
+        #logout-btn {
+            max-width: 400px;
+            margin: 20px auto;
         }
 
         .task {
@@ -30,76 +34,148 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
         }
 
-        .task input[type="text"] {
-            flex: 1;
-            margin-right: 10px;
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-        }
-
+        .task input[type="text"],
         .task select {
-            margin-right: 10px;
+            margin-right: 5px;
             padding: 5px;
             border: 1px solid #ccc;
             border-radius: 3px;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        button {
+            padding: 10px;
+            width: 100%;
+            margin-top: 5px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
         }
 
         button {
             background-color: #28a745;
             color: white;
             border: none;
-            border-radius: 3px;
-            padding: 5px 10px;
             cursor: pointer;
-            transition: background-color 0.3s;
         }
 
         button:hover {
             background-color: #218838;
         }
 
-        input[type="text"] {
-            margin-bottom: 10px;
-            padding: 10px;
-            width: calc(100% - 22px);
-            border: 1px solid #ccc;
-            border-radius: 3px;
-        }
-
-        #add-task-container {
-            display: flex;
-            flex-direction: column;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-
-        #add-task-container button {
-            margin-top: 10px;
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
     <h1>To-Do List</h1>
-    <input type="text" id="title" placeholder="Uzdevuma nosaukums">
-    <input type="text" id="description" placeholder="Uzdevuma apraksts">
-    <button onclick="addTask()">Pievienot uzdevumu</button>
 
-    <div id="task-list"></div>
+    <div id="auth-container">
+        <h3>Pieslēgties</h3>
+        <input type="text" id="login-username" placeholder="Lietotājvārds">
+        <input type="password" id="login-password" placeholder="Parole">
+        <button onclick="login()">Pieslēgties</button>
+
+        <h3>Vai reģistrēties</h3>
+        <input type="text" id="signup-username" placeholder="Jauns lietotājvārds">
+        <input type="password" id="signup-password" placeholder="Parole">
+        <button onclick="signup()">Reģistrēties</button>
+    </div>
+
+    <div id="main-content" class="hidden">
+        <div id="add-task-container">
+            <input type="text" id="title" placeholder="Uzdevuma nosaukums">
+            <input type="text" id="description" placeholder="Uzdevuma apraksts">
+            <button onclick="addTask()">Pievienot uzdevumu</button>
+            <button id="logout-btn" onclick="logout()" style="background-color: #dc3545;">Iziet</button>
+        </div>
+
+        <div id="task-list"></div>
+    </div>
 
     <script>
+        const API_URL = '/tasks';
+        const TOKEN_KEY = 'jwt_token';
+
+        function getToken() {
+            return localStorage.getItem(TOKEN_KEY);
+        }
+
+        function setToken(token) {
+            localStorage.setItem(TOKEN_KEY, token);
+        }
+
+        function clearToken() {
+            localStorage.removeItem(TOKEN_KEY);
+        }
+
+        function updateUI() {
+            const token = getToken();
+            if (token) {
+                document.getElementById('auth-container').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+                fetchTasks();
+            } else {
+                document.getElementById('auth-container').classList.remove('hidden');
+                document.getElementById('main-content').classList.add('hidden');
+            }
+        }
+
+        async function signup() {
+            const username = document.getElementById('signup-username').value;
+            const password = document.getElementById('signup-password').value;
+
+            const res = await fetch('/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await res.json();
+            alert(data.message || 'Reģistrācija veiksmīga!');
+        }
+
+        async function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await res.json();
+            if (data.token) {
+                setToken(data.token);
+                updateUI();
+            } else {
+                alert(data.message || 'Pieslēgšanās neizdevās');
+            }
+        }
+
+        function logout() {
+            clearToken();
+            updateUI();
+        }
+
         async function fetchTasks() {
-            const response = await fetch('/tasks');
-            const tasks = await response.json();
+            const res = await fetch(API_URL, {
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            });
+
+            const tasks = await res.json();
             const taskList = document.getElementById('task-list');
             taskList.innerHTML = '';
 
             tasks.forEach(task => {
-                const taskDiv = document.createElement('div');
-                taskDiv.className = 'task';
-                taskDiv.innerHTML = `
+                const div = document.createElement('div');
+                div.className = 'task';
+                div.innerHTML = `
                     <input type="text" value="${task.title}" onchange="updateTask('${task._id}', 'title', this.value)">
                     <input type="text" value="${task.description}" onchange="updateTask('${task._id}', 'description', this.value)">
                     <select onchange="updateTask('${task._id}', 'status', this.value)">
@@ -108,7 +184,7 @@
                     </select>
                     <button onclick="deleteTask('${task._id}')">Dzēst</button>
                 `;
-                taskList.appendChild(taskDiv);
+                taskList.appendChild(div);
             });
         }
 
@@ -116,27 +192,31 @@
             const title = document.getElementById('title').value;
             const description = document.getElementById('description').value;
 
-            if (title && description) {
-                await fetch('/tasks', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ title, description })
-                });
-                document.getElementById('title').value = '';
-                document.getElementById('description').value = '';
-                fetchTasks();
-            } else {
+            if (!title || !description) {
                 alert('Lūdzu, aizpildiet visus laukus!');
+                return;
             }
+
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + getToken()
+                },
+                body: JSON.stringify({ title, description })
+            });
+
+            document.getElementById('title').value = '';
+            document.getElementById('description').value = '';
+            fetchTasks();
         }
 
         async function updateTask(id, field, value) {
-            await fetch(`/tasks/${id}`, {
+            await fetch(`${API_URL}/${id}`, {
                 method: 'PUT',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + getToken()
                 },
                 body: JSON.stringify({ [field]: value })
             });
@@ -144,14 +224,14 @@
         }
 
         async function deleteTask(id) {
-            await fetch(`/tasks/${id}`, {
-                method: 'DELETE'
+            await fetch(`${API_URL}/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + getToken() }
             });
             fetchTasks();
         }
 
-        // Ielādēt uzdevumus, kad lapa tiek ielādēta
-        window.onload = fetchTasks;
+        window.onload = updateUI;
     </script>
 </body>
 </html>
